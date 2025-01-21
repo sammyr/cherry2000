@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/tooltip";
 
 // SettingsPanel component for managing user settings
-export function SettingsPanel({ isOpen, onClose, settings, onSave }) {
+export function SettingsPanel({ isOpen, onClose, settings, onSettingsChange }) {
   // State to manage form inputs and visibility toggles
   const [formState, setFormState] = useState({
     showMem0ApiKey: false,
@@ -59,7 +59,7 @@ export function SettingsPanel({ isOpen, onClose, settings, onSave }) {
     };
   }, [onClose]);
 
-  // Function to save settings to localStorage and call onSave prop
+  // Function to save settings to localStorage and call onSettingsChange prop
   const handleSaveSettings = (newSettings) => {
     localStorage.setItem("mem0ApiKey", newSettings.mem0ApiKey);
     localStorage.setItem("openRouterApiKey", newSettings.openRouterApiKey);
@@ -67,7 +67,7 @@ export function SettingsPanel({ isOpen, onClose, settings, onSave }) {
     localStorage.setItem("initialMessage", newSettings.initialMessage);
     localStorage.setItem("mem0UserId", newSettings.mem0UserId);
     localStorage.setItem("mem0AssistantId", newSettings.mem0AssistantId);
-    onSave(newSettings);
+    onSettingsChange(newSettings);
   };
 
   // Updated handleSubmit function
