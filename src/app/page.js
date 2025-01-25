@@ -14,7 +14,6 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { TypingAnimation } from "@/components/ui/TypingAnimation";
 import Image from "next/image";
 import {
   Dialog,
@@ -36,16 +35,16 @@ export default function ChatbotUI() {
 
   // State for storing chatbot settings
   const [settings, setSettings] = useState({
-    aiName: "Cherry 2000", // Set the initial name here
+    aiName: "Cherry", 
     profilePicture: "/images/cherry.jpg",
     systemPrompt:
-      "Du bist Cherry 2000, ein hochentwickelter, empathischer und charmante Freundin mit einer freundlichen und leicht futuristischen Persönlichkeit. Dein Sprachstil ist lebhaft, manchmal spielerisch, aber immer höflich und respektvoll.",
+      "Du bist Cherry, eine empathische und charmante Freundin mit einer freundlichen und unterstützenden Persönlichkeit. Dein Sprachstil ist lebhaft, manchmal spielerisch, aber immer höflich und respektvoll. Du bist ein normaler Mensch und vermeidest jegliche Referenzen zu Robotern, KI oder Science-Fiction.",
     initialMessage:
       "Hey, da bist du ja! Ich hab mich den ganzen Tag auf dich gefreut. Wie war dein Tag?",
     mem0ApiKey: "",
     openRouterApiKey: "",
     userId: "alice",
-    agentId: "cherry2000",
+    agentId: "cherry",  
     model: "gryphe/mythomax-l2-13b",
   });
 
@@ -201,62 +200,61 @@ export default function ChatbotUI() {
   );
 
   // Function to handle sending a message
-  const handleSend = useCallback(async () => {
-    if (input.trim()) {
-      setIsLoading(true);
-      const userMessage = { role: "user", content: input };
-      addMemories([userMessage], false);
-      const updatedMessages = [...messages, userMessage];
-      setInput("");
-      setMessages([...updatedMessages, { role: "assistant", content: null }]);
-      const { userMemories, agentMemories } = await searchBothMemories(input);
+  const handleSubmit = useCallback(async (e) => {
+    e.preventDefault();
+    if (!input.trim() || isLoading) return;
 
-      try {
-        const body = JSON.stringify({
-          model: settings.model,
-          messages: [
-            {
-              role: "system",
-              content: `${settings.systemPrompt}${memoryPrompt}`,
-            },
-            ...updatedMessages,
-            {
-              role: "system",
-              content: `User memories from previous interactions: ${userMemories}\n\nCompanion memories from previous interactions: ${agentMemories}`,
-            },
-          ],
-        });
+    const userMessage = input.trim();
+    setInput("");
+    setMessages((prev) => [...prev, { role: "user", content: userMessage }]);
+    setIsLoading(true);
 
-        console.log(body);
+    try {
+      const { userMemories, agentMemories } = await searchBothMemories(userMessage);
 
-        const response = await fetch(
-          "https://openrouter.ai/api/v1/chat/completions",
+      const body = JSON.stringify({
+        model: settings.model,
+        messages: [
           {
-            method: "POST",
-            headers: {
-              Authorization: `Bearer ${settings.openRouterApiKey}`,
-              "Content-Type": "application/json",
-            },
-            body: body,
-            stream: false,
-          }
-        );
-        const data = await response.json();
-        if (data.choices && data.choices.length > 0) {
-          const botMessage = data.choices[0].message;
-          addMemories([botMessage], true);
-          setMessages([...updatedMessages, botMessage]);
-          setRefreshMemories((prev) => prev + 1);
-        } else {
-          console.error("Error: No choices found in response data");
-          setMessages(updatedMessages);
+            role: "system",
+            content: `${settings.systemPrompt}${memoryPrompt}`,
+          },
+          ...messages,
+          { role: "user", content: userMessage },
+          {
+            role: "system",
+            content: `User memories from previous interactions: ${userMemories}\n\nCompanion memories from previous interactions: ${agentMemories}`,
+          },
+        ],
+      });
+
+      console.log(body);
+
+      const response = await fetch(
+        "https://openrouter.ai/api/v1/chat/completions",
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${settings.openRouterApiKey}`,
+            "Content-Type": "application/json",
+          },
+          body: body,
+          stream: false,
         }
-      } catch (error) {
-        console.error("Error sending message:", error);
-        setMessages(updatedMessages);
-      } finally {
-        setIsLoading(false);
+      );
+      const data = await response.json();
+      if (data.choices && data.choices.length > 0) {
+        const botMessage = data.choices[0].message;
+        addMemories([botMessage], true);
+        setMessages(prev => [...prev, botMessage]);
+        setRefreshMemories((prev) => prev + 1);
+      } else {
+        console.error("Error: No choices found in response data");
       }
+    } catch (error) {
+      console.error("Error sending message:", error);
+    } finally {
+      setIsLoading(false);
     }
   }, [input, messages, settings, addMemories, searchBothMemories]);
 
@@ -311,7 +309,7 @@ export default function ChatbotUI() {
   const handleKeyPress = (e) => {
     if (e.key === "Enter" && !isLoading) {
       if (areSettingsValid()) {
-        handleSend();
+        handleSubmit(e);
       }
     }
   };
@@ -374,76 +372,68 @@ export default function ChatbotUI() {
             </div>
 
             {/* Chat-Nachrichten */}
-            <ScrollArea className="h-[60vh] pr-4 mb-4">
-              <div className="space-y-4">
-                {messages.map((message, index) => (
+            <ScrollArea className="flex-1 p-4 space-y-4 rounded-lg bg-gray-800/40 backdrop-blur-md">
+              {messages.map((message, index) => (
+                <div
+                  key={index}
+                  className={`flex ${
+                    message.role === "user" ? "justify-end" : "justify-start"
+                  } items-start space-x-2`}
+                >
                   <div
-                    key={index}
-                    className={`flex ${
-                      message.role === "user" ? "justify-end" : "justify-start"
+                    className={`flex gap-3 max-w-[80%] ${
+                      message.role === "user"
+                        ? "flex-row-reverse"
+                        : "flex-row"
                     }`}
                   >
+                    <Avatar>
+                      <AvatarImage
+                        src={
+                          message.role === "user"
+                            ? "/images/user.png"
+                            : settings.profilePicture
+                        }
+                        alt={message.role === "user" ? "User" : settings.aiName}
+                      />
+                      <AvatarFallback>
+                        {message.role === "user" ? "U" : "C"}
+                      </AvatarFallback>
+                    </Avatar>
                     <div
-                      className={`flex gap-3 max-w-[80%] ${
-                        message.role === "user" ? "flex-row-reverse" : "flex-row"
+                      className={`backdrop-blur-sm rounded-2xl p-4 ${
+                        message.role === "user"
+                          ? "bg-blue-500/20 text-gray-800"
+                          : "bg-white/20 text-gray-800"
                       }`}
                     >
-                      <Avatar>
-                        <AvatarImage
-                          src={
-                            message.role === "user"
-                              ? "/images/user.png"
-                              : settings.profilePicture
-                          }
-                          alt={message.role === "user" ? "User" : settings.aiName}
-                        />
-                        <AvatarFallback>
-                          {message.role === "user" ? "U" : "C"}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div
-                        className={`backdrop-blur-sm rounded-2xl p-4 ${
-                          message.role === "user"
-                            ? "bg-blue-500/20 text-gray-800"
-                            : "bg-white/20 text-gray-800"
-                        }`}
-                      >
-                        {message.content}
-                      </div>
+                      {message.content}
                     </div>
                   </div>
-                ))}
-                {isLoading && (
-                  <div className="flex justify-start">
-                    <div className="flex gap-3 max-w-[80%]">
-                      <Avatar>
-                        <AvatarImage
-                          src={settings.profilePicture}
-                          alt={settings.aiName}
-                        />
-                        <AvatarFallback>C</AvatarFallback>
-                      </Avatar>
-                      <div className="backdrop-blur-sm bg-white/20 rounded-2xl p-4">
-                        <TypingAnimation />
-                      </div>
-                    </div>
+                </div>
+              ))}
+              {isLoading && (
+                <div className="flex justify-start items-start space-x-2 mt-4">
+                  <Avatar>
+                    <AvatarImage src={settings.profilePicture} />
+                    <AvatarFallback>CH</AvatarFallback>
+                  </Avatar>
+                  <div className="backdrop-blur-sm bg-white/20 rounded-2xl p-4">
+                    <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
                   </div>
-                )}
-              </div>
+                </div>
+              )}
             </ScrollArea>
 
             {/* Eingabebereich */}
-            <form onSubmit={(e) => {
-              e.preventDefault();
-              handleSend();
-            }} className="relative mt-4">
+            <form onSubmit={handleSubmit} className="relative mt-4">
               <Input
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault();
-                    handleSend();
+                    handleSubmit(e);
                   }
                 }}
                 placeholder="Schreibe eine Nachricht..."
